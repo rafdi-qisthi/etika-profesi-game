@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  /* Membuat background gradient yang elegan */
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+  color: #f8fafc;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
