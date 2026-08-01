@@ -16,7 +16,7 @@ export default function App() {
     const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
     const [progress, setProgress] = useState({ s1: 1, s2: 1, s3: 1, s4: 1, s5: 1, s6: 1 });
     const [feedback, setFeedback] = useState(null);
-
+    const [canProceed, setCanProceed] = useState(false); 
     const [levelHistory, setLevelHistory] = useState([]); 
     const [redemptionUsed, setRedemptionUsed] = useState(false);
     const [redemptionQuestion, setRedemptionQuestion] = useState(null);
@@ -25,6 +25,7 @@ export default function App() {
     const openSector = (sector) => { setCurrentSector(sector); setView('levelGrid'); };
     const backToMap = () => setView('map');
     const backToGrid = () => setView('levelGrid');
+    const backToLanding = () => setView('landing');
 
     const openLevel = (level, isUnlocked) => {
         if (!isUnlocked) return;
@@ -47,61 +48,72 @@ export default function App() {
     const handleChoice = (choice) => {
         if (feedback) return; 
         setFeedback(choice);
+        setCanProceed(false);
+        setTimeout(() => setCanProceed(true), 600); 
+
         const currentQ = currentLevel.questions[currentQuestionIdx];
         const isCorrect = choice.correct;
-        
-        setTimeout(() => {
-            setLevelHistory(prev => [
-                ...prev,
-                {
-                    questionIdx: currentQuestionIdx,
-                    dialog: currentQ.dialog,
-                    npc: currentQ.npc,
-                    choices: currentQ.choices,
-                    selectedText: choice.text,
-                    correct: isCorrect,
-                    isRedeemed: false
-                }
-            ]);
 
-            if (isCorrect) {
-                setTotalStars(prev => prev + 20); 
-            } else {
-                setLives(prev => Math.max(0, prev - 1)); // Salah kurang 1 nyawa
+        setLevelHistory(prev => [
+            ...prev,
+            {
+                questionIdx: currentQuestionIdx,
+                dialog: currentQ.dialog,
+                npc: currentQ.npc,
+                choices: currentQ.choices,
+                selectedText: choice.text,
+                correct: isCorrect,
+                isRedeemed: false
             }
+        ]);
 
-            if (currentQuestionIdx < currentLevel.questions.length - 1) {
-                setCurrentQuestionIdx(prev => prev + 1);
-                setView('dialog'); 
-            } else {
-                setView('summary');
-            }
-            setFeedback(null);
-        }, 2200);
+        if (isCorrect) {
+            setTotalStars(prev => prev + 20); 
+        } else {
+            setLives(prev => Math.max(0, prev - 1)); 
+        }
     };
 
-    // LOGIKA PERBAIKAN: JIKA BENAR HANYA DAPAT SETENGAH NYAWA (0.5)
+    const handleNextDialog = () => {
+        if (!canProceed) return;
+        setCanProceed(false);
+
+        if (currentQuestionIdx < currentLevel.questions.length - 1) {
+            setCurrentQuestionIdx(prev => prev + 1);
+            setView('dialog'); 
+        } else {
+            setView('summary');
+        }
+        setFeedback(null);
+    };
+
     const handleRedemptionChoice = (choice) => {
         if (feedback) return;
         setFeedback(choice);
-        setTimeout(() => {
-            if (choice.correct) {
-                setTotalStars(prev => prev + 15); 
-                setLives(prev => Math.min(5, prev + 0.5)); // <-- Diubah menjadi +0.5 Nyawa
-                setLevelHistory(prev => prev.map(item => 
-                    item.questionIdx === redemptionQuestion.questionIdx 
-                        ? { ...item, correct: true, selectedText: choice.text, isRedeemed: true }
-                        : item
-                ));
-            } else {
-                setLives(prev => Math.max(0, prev - 1)); 
-            }
-            
-            setRedemptionUsed(true);
-            setRedemptionQuestion(null);
-            setFeedback(null);
-            setView('summary');
-        }, 2200);
+        setCanProceed(false);
+        setTimeout(() => setCanProceed(true), 600);
+
+        if (choice.correct) {
+            setTotalStars(prev => prev + 15); 
+            setLives(prev => Math.min(5, prev + 0.5)); 
+            setLevelHistory(prev => prev.map(item => 
+                item.questionIdx === redemptionQuestion.questionIdx 
+                    ? { ...item, correct: true, selectedText: choice.text, isRedeemed: true }
+                    : item
+            ));
+        } else {
+            setLives(prev => Math.max(0, prev - 1)); 
+        }
+    };
+
+    const handleNextRedemption = () => {
+        if (!canProceed) return;
+        setCanProceed(false);
+
+        setRedemptionUsed(true);
+        setRedemptionQuestion(null);
+        setFeedback(null);
+        setView('summary');
     };
 
     const TopBar = ({ backAction, backText }) => (
@@ -153,26 +165,64 @@ export default function App() {
 
     return (
         <div className="w-full min-h-screen font-sans select-none relative bg-[#0f172a] text-slate-200 flex flex-col">
-            {view === 'landing' && (
-                <div className="w-full flex-grow flex flex-col items-center justify-center relative overflow-hidden">
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900 via-[#0f172a] to-black"></div>
-                    <div className="z-10 flex flex-col items-center animate-in zoom-in duration-700 mt-10">
-                        <div className="bg-emerald-500 text-slate-900 font-bold px-5 py-1.5 rounded-full text-xs mb-8 flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.5)] tracking-widest uppercase">
-                            <ShieldCheck className="w-4 h-4" /> Simulasi Keputusan Etis Profesional
-                        </div>
-                        <h1 className="text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-cyan-400 text-center mb-4 tracking-tight">
-                            Ethica: Pro Series
-                        </h1>
-                        <button onClick={startGame} className="mt-8 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-900 font-black text-xl py-4 px-12 rounded-full transition-all hover:scale-105 shadow-[0_0_30px_rgba(16,185,129,0.4)] flex items-center gap-3">
-                            <Play className="fill-slate-900 w-6 h-6" /> Mulai Simulasi
-                        </button>
-                    </div>
+{view === 'landing' && (
+    <div className="w-full flex-grow flex flex-col items-center justify-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900 via-[#0f172a] to-black"></div>
+
+        {/* Glow orbs blur warna-warni melayang di background */}
+        <div className="absolute top-10 left-1/4 w-40 h-40 bg-emerald-500/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-20 right-1/4 w-56 h-56 bg-cyan-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute top-1/3 right-10 w-32 h-32 bg-indigo-500/25 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+        <div className="absolute bottom-1/3 left-10 w-32 h-32 bg-amber-500/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }}></div>
+
+        {/* Ikon-ikon dekoratif melayang, disebar lebih merata & lebih jelas */}
+        <div className="absolute top-16 left-10 text-4xl opacity-30 animate-bounce">🧠</div>
+        <div className="absolute top-24 right-16 text-4xl opacity-30 animate-bounce" style={{ animationDelay: '0.3s' }}>⚖️</div>
+        <div className="absolute bottom-24 left-20 text-4xl opacity-30 animate-bounce" style={{ animationDelay: '0.6s' }}>🎯</div>
+        <div className="absolute bottom-16 right-24 text-4xl opacity-30 animate-bounce" style={{ animationDelay: '0.9s' }}>🏆</div>
+        <div className="absolute top-1/2 left-6 text-3xl opacity-25 animate-bounce" style={{ animationDelay: '0.2s' }}>📋</div>
+        <div className="absolute top-1/2 right-6 text-3xl opacity-25 animate-bounce" style={{ animationDelay: '1.1s' }}>🔍</div>
+        <div className="absolute top-10 right-1/3 text-3xl opacity-25 animate-bounce" style={{ animationDelay: '0.7s' }}>💼</div>
+        <div className="absolute bottom-10 left-1/3 text-3xl opacity-25 animate-bounce" style={{ animationDelay: '1.3s' }}>✅</div>
+
+        <div className="z-10 flex flex-col items-center animate-in zoom-in duration-700 mt-10 px-4">
+            <div className="bg-emerald-500 text-slate-900 font-bold px-5 py-1.5 rounded-full text-xs mb-6 flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.5)] tracking-widest uppercase">
+                <ShieldCheck className="w-4 h-4" /> Kuis Interaktif Simulasi Keputusan
+            </div>
+
+            <h1 className="text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-cyan-400 text-center mb-2 tracking-tight">
+                Game Etika Profesi
+            </h1>
+            <p className="text-slate-400 text-center max-w-lg mb-8 font-medium">
+                Jawab studi kasus dunia kerja, kumpulkan bintang, dan jaga nyawa karirmu tetap utuh!
+            </p>
+
+            {/* Info singkat biar jelas ini kuis */}
+            <div className="flex flex-wrap justify-center gap-4 mb-10">
+                <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700 px-4 py-2 rounded-xl">
+                    <MessageSquare className="w-5 h-5 text-cyan-400" />
+                    <span className="text-slate-200 text-sm font-bold">Studi Kasus Nyata</span>
                 </div>
-            )}
+                <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700 px-4 py-2 rounded-xl">
+                    <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+                    <span className="text-slate-200 text-sm font-bold">Kumpulkan Bintang</span>
+                </div>
+                <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700 px-4 py-2 rounded-xl">
+                    <Heart className="w-5 h-5 text-red-500 fill-red-500" />
+                    <span className="text-slate-200 text-sm font-bold">Jaga Nyawa Karir</span>
+                </div>
+            </div>
+
+            <button onClick={startGame} className="bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-900 font-black text-xl py-4 px-12 rounded-full transition-all hover:scale-105 shadow-[0_0_30px_rgba(16,185,129,0.4)] flex items-center gap-3">
+                <Play className="fill-slate-900 w-6 h-6" /> Mulai Kuis
+            </button>
+        </div>
+    </div>
+)}
 
             {view === 'map' && (
                 <div className="w-full h-full flex flex-col relative pt-28 px-6 bg-slate-900 flex-grow">
-                    <TopBar />
+                    <TopBar backAction={backToLanding} backText="← Beranda" />
                     <div className="relative z-10 flex flex-col items-center w-full max-w-6xl mx-auto flex-grow mt-6 md:mt-10">
                         <div className="flex items-center gap-3 mb-8">
                             <MapIcon className="w-10 h-10 text-emerald-400" />
@@ -240,8 +290,17 @@ export default function App() {
                                     </button>
                                 ))
                             ) : (
-                                <div className={`col-span-1 md:col-span-2 w-full p-6 rounded-xl border text-center font-bold text-lg ${feedback.correct ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
-                                    {feedback.feedback}
+                                <div className="col-span-1 md:col-span-2 flex flex-col gap-3">
+                                    <div className={`w-full p-6 rounded-xl border text-center font-bold text-lg ${feedback.correct ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+                                        {feedback.feedback}
+                                    </div>
+                                    <button
+                                        onClick={handleNextDialog}
+                                        disabled={!canProceed}
+                                        className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${!canProceed ? 'bg-slate-700 text-slate-400 cursor-not-allowed' : feedback.correct ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-900' : 'bg-red-500 hover:bg-red-400 text-white'}`}
+                                    >
+                                        {canProceed ? 'Lanjut →' : '...'}
+                                    </button>
                                 </div>
                             )}
                         </div>
@@ -273,8 +332,17 @@ export default function App() {
                                     </button>
                                 ))
                             ) : (
-                                <div className={`col-span-1 md:col-span-2 w-full p-6 rounded-xl border text-center font-bold ${feedback.correct ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
-                                    {feedback.feedback}
+                                <div className="col-span-1 md:col-span-2 flex flex-col gap-3">
+                                    <div className={`w-full p-6 rounded-xl border text-center font-bold ${feedback.correct ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+                                        {feedback.feedback}
+                                    </div>
+                                    <button
+                                        onClick={handleNextRedemption}
+                                        disabled={!canProceed}
+                                        className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${!canProceed ? 'bg-slate-700 text-slate-400 cursor-not-allowed' : feedback.correct ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-900' : 'bg-red-500 hover:bg-red-400 text-white'}`}
+                                    >
+                                        {canProceed ? 'Lanjut →' : '...'}
+                                    </button>
                                 </div>
                             )}
                         </div>
